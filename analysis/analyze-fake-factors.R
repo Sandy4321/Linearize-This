@@ -1,4 +1,4 @@
-source("src/columns.R")
+source("src/factor.R")
 
 df_c = mtcars
 pred = c("mpg", "hp", "wt")

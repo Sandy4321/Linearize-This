@@ -1,4 +1,4 @@
-"NULL_PREDICTORx","NOT_FACTORxSepal.Length","NOT_FACTORxSepal.Width","NOT_FACTORxPetal.Length","NOT_FACTORxPetal.Width","IS_FACTORxSpecies"
+"NULL_PREDICTORx","NOT_FACTORxSepal.Length","NOT_FACTORxSepal.Width","NOT_FACTORxPetal.Length","NOT_FACTORxPetal.Width","MAYBE_FACTORxSpecies"
 "1",5.1,3.5,1.4,0.2,"setosa"
 "2",4.9,3,1.4,0.2,"setosa"
 "3",4.7,3.2,1.3,0.2,"setosa"

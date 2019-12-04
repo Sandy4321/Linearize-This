@@ -1,4 +1,4 @@
-"NULL_PREDICTORx","IS_FACTORxlfp","RESPONSE_VARIABLExlnnlinc","NOT_FACTORxage","NOT_FACTORxeduc","NOT_FACTORxnyc","NOT_FACTORxnoc","IS_FACTORxforeign"
+"NULL_PREDICTORx","MAYBE_FACTORxlfp","NOT_FACTORxlnnlinc","MAYBE_FACTORxage","MAYBE_FACTORxeduc","MAYBE_FACTORxnyc","MAYBE_FACTORxnoc","MAYBE_FACTORxforeign"
 "1","no",10.787497,3,8,1,1,"no"
 "2","yes",10.524251,4.5,8,0,1,"no"
 "3","no",10.968578,4.6,9,0,0,"no"
