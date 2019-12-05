@@ -91,9 +91,11 @@ plot_by_factor = function(df, factor_col, responses=NULL, predictors=NULL) {
     factor_levels = levels(col)
     num_levels = length(factor_levels)
     coefficients = vector(mode="numeric", length=num_levels)
-    par(mfrow=c(num_resp, num_pred))
+    # par(mfrow=c(num_resp, num_pred))
+    par(mfrow=c(1, num_pred))
 
-    for (r in 1:num_resp) {
+    # for (r in 1:num_resp) {
+    for (r in 1:1) {
         for (c in 1:num_pred) {
             response = responses[[r]]
             predictor = predictors[[c]]

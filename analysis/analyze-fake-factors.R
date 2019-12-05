@@ -12,7 +12,6 @@ head(df_cf)
 head(df_ci2)
 head(df_cl)
 
-plot_by_factor(df_cf, "SHUFFLE_INDEX", responses=pred, predictors=pred)
 plot_by_factor(df_cf, "FAKE_FACTORx2", responses=pred, predictors=pred)
 plot_by_factor(df_cf, "FAKE_FACTORx4", responses=pred, predictors=pred)
 plot_by_factor(df_cf, "FAKE_FACTORx6", responses=pred, predictors=pred)

@@ -171,7 +171,7 @@ iterate_columns = function(filenames) {
 
 # tests this combination of columns and outputs stats for model fitting
 # pass in names of columns
-evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric, candidate_as_factor) {
+evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric, candidate_as_factor, allow_na=TRUE, do_test=TRUE) {
     candidate = candidate_as_factor
     if (is.null(predictor) || is.na(predictor)) {
         formula_null = paste(response, "~", candidate_as_numeric, sep="")
@@ -183,37 +183,57 @@ evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric
         formula_fit = paste(response, "~", predictor, "+", candidate, "+", predictor, ":", candidate, sep="")
         predictor_is_null = FALSE
     }
-    test_ids = split_test_set(dataframe[,candidate])
-    train = dataframe[-test_ids,]
-    test = dataframe[test_ids,]
+    train = dataframe
+    test = NULL
+    if (do_test) {
+        test_ids = split_test_set(dataframe[,candidate])
+        train = dataframe[-test_ids,]
+        test = dataframe[test_ids,]
+    }
     lm_null = lm(formula_null, data=train)
     lm_fit = lm(formula_fit, data=train)
 
-    n = nrow(test)
-    test_error_null = predict(lm_null, test) - test[,response]
-    test_error_fit = predict(lm_fit, test) - test[,response]
-    num_null = sum(abs(test_error_null) >= abs(test_error_fit))
-    num_fit = n - num_null
-    # response under testing
-    test_mse_null = sum( test_error_null^2 ) / n
-    test_mse_fit = sum( test_error_fit^2 ) / n
-    test_pbest_null = num_null / n
-    test_pbest_fit = 1 - test_pbest_null
-
-    # to decide if this is a factor, apply equality test to mse and prop
-    pval_test_mse_diff = test_error_diff(test_error_null, test_error_fit)
-    pval_test_prop_diff = test_prop_diff(num_null, num_fit)
-    is_factor_by_mse = pval_test_mse_diff < SIGNIFICANCE
-    is_factor_by_prop = pval_test_prop_diff < SIGNIFICANCE
-
+    test_mse_null = NA
+    test_mse_fit = NA
+    test_pbest_null = NA
+    test_pbest_fit = NA
+    pval_test_mse_diff = NA
+    pval_test_prop_diff = NA
+    is_factor_by_mse = NA
+    is_factor_by_prop = NA
+    if (do_test) {
+        n = nrow(test)
+        test_error_null = predict(lm_null, test) - test[,response]
+        test_error_fit = predict(lm_fit, test) - test[,response]
+        num_null = sum(abs(test_error_null) >= abs(test_error_fit))
+        num_fit = n - num_null
+        # response under testing
+        test_mse_null = sum( test_error_null^2 ) / n
+        test_mse_fit = sum( test_error_fit^2 ) / n
+        test_pbest_null = num_null / n
+        test_pbest_fit = 1 - test_pbest_null
+        # to decide if this is a factor, apply equality test to mse and prop
+        pval_test_mse_diff = test_error_diff(test_error_null, test_error_fit)
+        pval_test_prop_diff = test_prop_diff(num_null, num_fit)
+        is_factor_by_mse = pval_test_mse_diff < SIGNIFICANCE
+        is_factor_by_prop = pval_test_prop_diff < SIGNIFICANCE
+    }
 
     summary_null = summary(lm_null)
     summary_fit = summary(lm_fit)
     # Rsq and df
     adj_rsq_null = summary_null$adj.r.squared
-    if (is.na(adj_rsq_null)) { adj_rsq_null = 1 }
+    is_na_adj_rsq_null = FALSE
+    if (is.na(adj_rsq_null) && allow_na) {
+        adj_rsq_null = 1
+        is_na_adj_rsq_null=TRUE
+    }
     adj_rsq_fit = summary_fit$adj.r.squared
-    if (is.na(adj_rsq_fit)) { adj_rsq_fit = 1 }
+    is_na_adj_rsq_fit = FALSE
+    if (is.na(adj_rsq_fit) && allow_na) {
+        adj_rsq_fit = 1
+        is_na_adj_rsq_fit=TRUE
+    }
     n_slopes_null = summary_null$df[3]
     n_slopes_fit = summary_fit$df[3]
     adj_n_slopes_null = summary_null$df[1]
@@ -228,12 +248,24 @@ evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric
     param_null = summary_null$coefficients
     param_fit = summary_fit$coefficients
     pvalue_null = param_null[,4]
-    pvalue_null[is.na(pvalue_null)] = 0
     pvalue_fit = param_fit[,4]
-    pvalue_fit[is.na(pvalue_fit)] = 0
+    if (allow_na) {
+        is_na_pvalue_null = FALSE
+        if (sum(is.na(pvalue_null)) > 0) {
+            is_na_pvalue_null = TRUE
+        }
+        is_na_pvalue_fit = FALSE
+        if (sum(is.na(pvalue_fit)) > 0) {
+            is_na_pvalue_fit = TRUE
+        }
+        pvalue_null[is.na(pvalue_null)] = 0
+        pvalue_fit[is.na(pvalue_fit)] = 0
+    }
     # distribution of parameters
     na_null = sum(is.na(param_null[,1]))
     na_fit = sum(is.na(param_fit[,1]))
+    t_na_null = sum(is.na(param_null[,4]))
+    t_na_fit = sum(is.na(param_fit[,4]))
     mean_pval_null = mean(pvalue_null)
     mean_pval_fit = mean(pvalue_fit)
     median_pval_null = median(pvalue_null)
@@ -254,34 +286,50 @@ evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric
     anova_results = anova(lm_null, lm_fit)
     # anova between models
     anova_p = anova_results[2,6]
-    if (is.na(anova_p)) { anova_p = 0 }
+    is_na_anova_p = FALSE
+    if (is.na(anova_p) && allow_na) {
+        is_na_anova_p = TRUE
+        anova_p = 0
+    }
 
     added_params = subset_difference(param_null, param_fit)[,1]
     added_params = sort(added_params[!is.null(added_params)])
     ranks = c(1:length(added_params))
     # linearity of added parameters using lm on parameters
-    pval_param = 1
-    adj_rsq_param = 0
+    pval_param = NA
+    adj_rsq_param = NA
+
+    is_na_pval_param = FALSE
+    is_na_adj_rsq_param = FALSE
     if (length(added_params) > 1) {
         lm_param = lm(added_params~ranks)
         summary_param = summary(lm_param)
         pval_param = summary_null$coefficients[2,4]
         adj_rsq_param = summary_param$adj.r.squared
     }
-    if (is.na(adj_rsq_param)) { adj_rsq_param = 1 }
+    else if (allow_na) {
+        is_na_pval_param = TRUE
+        is_na_adj_rsq_param = TRUE
+        pval_param = 1
+        adj_rsq_param = 0
+    }
+    if (is.na(adj_rsq_param) && allow_na) {
+        adj_rsq_param = 1
+        is_na_adj_rsq_param = TRUE
+    }
 
     list_stats = list(
-        "column"=strip_prefix_col_name(candidate),
-        "is_factor_by_mse"=is_factor_by_mse,
-        "is_factor_by_prop"=is_factor_by_prop,
-        "pval_test_mse_diff"=pval_test_mse_diff,
-        "pval_test_prop_diff"=pval_test_prop_diff,
-        "formula_null"=formula_null,
-        "formula_fit"=formula_fit,
-        "test_mse_null"=test_mse_null,
-        "test_mse_fit"=test_mse_fit,
-        "test_pbest_null"=test_pbest_null,
-        "test_pbest_fit"=test_pbest_fit,
+        "NULL_PREDICTORxcolumn"=strip_prefix_col_name(candidate),
+        "NULL_PREDICTORxis_factor_by_mse"=is_factor_by_mse,
+        "NULL_PREDICTORxis_factor_by_prop"=is_factor_by_prop,
+        "NULL_PREDICTORxpval_test_mse_diff"=pval_test_mse_diff,
+        "NULL_PREDICTORxpval_test_prop_diff"=pval_test_prop_diff,
+        "NULL_PREDICTORxformula_null"=formula_null,
+        "NULL_PREDICTORxformula_fit"=formula_fit,
+        "NULL_PREDICTORxtest_mse_null"=test_mse_null,
+        "NULL_PREDICTORxtest_mse_fit"=test_mse_fit,
+        "NULL_PREDICTORxtest_pbest_null"=test_pbest_null,
+        "NULL_PREDICTORxtest_pbest_fit"=test_pbest_fit,
         "adj_rsq_null"=adj_rsq_null,
         "adj_rsq_fit"=adj_rsq_fit,
         "n_slopes_null"=n_slopes_null,
@@ -296,6 +344,8 @@ evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric
         "alias_fit"=alias_fit,
         "na_null"=na_null,
         "na_fit"=na_fit,
+        "t_na_null"=t_na_null,
+        "t_na_fit"=t_na_fit,
         "mean_pval_null"=mean_pval_null,
         "mean_pval_fit"=mean_pval_fit,
         "median_pval_null"=median_pval_null,
@@ -308,8 +358,15 @@ evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric
         "anova_p"=anova_p,
         "pval_param"=pval_param,
         "adj_rsq_param"=adj_rsq_param,
-        "predictor_is_null"=predictor_is_null
-        )
+        "predictor_is_null"=predictor_is_null,
+        "is_na_adj_rsq_null"=is_na_adj_rsq_null,
+        "is_na_adj_rsq_fit"=is_na_adj_rsq_fit,
+        "is_na_pvalue_null"=is_na_pvalue_null,
+        "is_na_pvalue_fit"=is_na_pvalue_fit,
+        "is_na_anova_p"=is_na_anova_p,
+        "is_na_pval_param"=is_na_pval_param,
+        "is_na_adj_rsq_param"=is_na_adj_rsq_param
+    )
 
     return(list_stats)
 }
