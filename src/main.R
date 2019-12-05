@@ -9,14 +9,16 @@ TRAIN_SET = file.path("data", "trainset")
 TEST_SET = file.path("data", "testset")
 EXTENSION = "csv"
 
-# # only run once to get data
-# save_builtin_datasets_to_file(5, TRAIN_SET, EXTENSION)
+# only run once to get data
+save_builtin_datasets_to_file(5, TRAIN_SET, EXTENSION)
 
-# filenames = list_data_filenames(TRAIN_SET, EXTENSION)
-# filenames = sapply(filenames, function(name) file.path(TRAIN_SET, name))
-# stats = iterate_columns(filenames)
-# save_dataframe(stats, timestamp("column_stats", EXTENSION), "data")
+# generate meta data
+filenames = list_data_filenames(TRAIN_SET, EXTENSION)
+filenames = sapply(filenames, function(name) file.path(TRAIN_SET, name))
+stats = iterate_columns(filenames)
+save_dataframe(stats, timestamp("column_stats", EXTENSION), "data")
 
+# test example
 quakes = read.table("data/testset/quakes.csv", sep=",", header=TRUE)
 quakes$AS_NUMERICxmag = as.numeric(quakes$MAYBE_FACTORxmag)
 quakes$AS_FACTORxmag = as.factor(quakes$MAYBE_FACTORxmag)
@@ -49,6 +51,7 @@ df = combine_response(df)
 df = feature_engineering(df)
 df = remove_constant_cols(df)
 
+# the final models from analysis/analyze-logistic-model.R
 df_no_predictor = df[df$predictor_is_null,]
 df_with_predictor = df[!df$predictor_is_null,]
 final_no_predictor = glm(formula = is_factor ~ df_ratio_fit + aic_null_to_fit_diff + 
@@ -58,6 +61,7 @@ final_with_predictor = glm(formula = is_factor ~ df_ratio_null + df_ratio_fit + 
     is_na_anova_p + adj_rsq_null_to_fit_diff + df_ratio_fit_to_null_ratio, 
     data = df_with_predictor)
 
+# predictions
 predictions_no_predictor = predict(final_no_predictor, newdata=test_df_no_predictor)
 print(predictions_no_predictor)
 predictions_with_predictor = predict(final_with_predictor, newdata=test_df_with_predictor)
