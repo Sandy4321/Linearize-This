@@ -28,32 +28,38 @@ Overview
 The goal of this project is to detect linear and non-linear correlations that
 indicate the types of variables present in a dataset.
 
-If a variable which is strongly linearly correlated with the response variable
-is fitted as a categorical (factor) variable, its slopes (parameters) under linear
-regression should exhibit a strong trend. Conversely, if a predictor variable 
-has little or no correlation then fitting it as a factor will not result in
+Suppose a candidate variable which is strongly correlated with a response variable
+is fitted as a categorical (factor) variable. Then its slopes (parameters) under linear
+regression should exhibit a strong trend. On the other hand, if the predictor variable 
+shows little or no correlation, then fitting it as a factor will not result in
 slopes with a significant trend.
 
 If a variable has a non-linear interaction with another predictor, there should
 be a similar trend in the slopes of the variable and predictor combined as
-a series of interaction terms. Conversely, if there is no interaction,
+a series of interaction terms. On the other hand if there is no interaction,
 then the fitted slopes of each predictor should remain consistent due to the 
 independence of the predictors.
 
 This theory is supported by the plots in `analysis/analyze-fake-factors.R`,
-where uncorrelated, linearly correlated, and interacting variables are generated
-and plotted as factors with other variables.
+where uncorrelated, linearly correlated, and interacting variables are artifically
+generated and plotted as factors with other variables.
 
-By looking at statistics such as the distribution of the slopes, number of 
+By examining statistics such as the distribution of the slopes, number of 
 factor levels (or degrees of freedom), and ANOVA comparison between models
 with and without the factor, it may be possible to classify the type of
 correlation a variable has with others in the dataset. For grading purposes,
 this project uses logistic regression to determine a decision boundary from
 empirically acquired data.
 
+A possible extension is to apply principal component analysis (PCA) to the
+slope distribution across multiple predictors in order to find a vector which
+maximizes the variation of the factor of interest. This vector can then be
+used to rank the factor, potentially allowing the recovery of ordinal information
+from categorical data.
+
 Methodology
 -----------
-* Find a large number of datasets with multiple columns of both potentially
+* Find a large number of datasets with multiple columns of both
 numerical and categorical data
 * Identify candidate variables as those which can be factorized
 (variables can also be binned to allow factorization)
@@ -63,7 +69,7 @@ the predictor, or just includes the candidate factor when the predictor is null.
 * To detect trends in the slopes unique to the larger model, calculate statistics
 on the model pair, such as difference in degrees of freedom, R squared, ANOVA,
 mean and median of the slope distribution, etc.
-* Test model pairs on separate data. Use statistical tests such as Wilcoxon signed rank
+* Evaluate model pairs on test data. Use statistical tests such as Wilcoxon signed rank
 test or test of proportions to determine whether there is a significant improvement in
 mean squared error when the candidate variable is added as a factor/interaction.
 * Fit logistic model onto this meta-dataset to predict the above.
