@@ -70,6 +70,7 @@ colnames(list_of_predictors) = col_names
 
 # try combining the presence of NA by adding in factors
 dataframe = read.table(file.path("data", "column_stats_2019-12-04-17-28-03.csv"), header=TRUE, sep=",")
+dataframe = read.table(file.path("data", "column_stats_2019-12-05-05-07-10.csv"), header=TRUE, sep=",")
 df = combine_response(dataframe)
 df = feature_engineering(df)
 df = remove_constant_cols(df)
@@ -77,7 +78,7 @@ engineered_df = df
 split_glms = split_and_test(df)
 # seems to help somewhat
 
-# recombine the split models using predictor_is_null as a factor
+# try to recombine the split models using predictor_is_null as a factor
 predictors = colnames(df)[colnames(df) != "is_factor"]
 formula_str = paste(predictors, collapse=" + ")
 formula_str_factor = paste(predictors[predictors != "predictor_is_null"], collapse=":predictor_is_null + ")
@@ -101,10 +102,8 @@ anova(aic_back_glm, bic_back_glm, test="Chisq")
 anova(aic_back_glm, bic_forward_glm, test="Chisq")
 # analysis: they all differ
 
-# look at winning model
-summary(aic_back_glm)
 # mean_pval_fit is not significant, try removing
-glm_final = glm("is_factor ~ df_ratio_null + df_ratio_fit + alias_fit + 
+glm_combined = glm("is_factor ~ df_ratio_null + df_ratio_fit + alias_fit + 
     median_pval_null + pval_param + predictor_is_null + 
     is_na_anova_p + is_na_pval_param + is_na_adj_rsq_param + 
     adj_rsq_null_to_fit_diff + adj_n_slopes_null_to_fit_ratio + 
@@ -113,7 +112,7 @@ glm_final = glm("is_factor ~ df_ratio_null + df_ratio_fit + alias_fit +
     predictor_is_null:is_na_adj_rsq_param + predictor_is_null:adj_rsq_null_to_fit_diff + 
     predictor_is_null:df_ratio_fit_to_null_ratio", data = df)
 # not significant difference, slightly worse residual
-anova(aic_back_glm, glm_final, test="Chisq")
+anova(aic_back_glm, glm_combined, test="Chisq")
 
 # try power transform on reduced model
 list_of_columns = cbind(
@@ -147,7 +146,7 @@ glm_transformed_1 = glm("is_factor ~ log_df_ratio_null + log_df_ratio_fit + alia
     df_ratio_fit:predictor_is_null + 
     predictor_is_null:is_na_adj_rsq_param + predictor_is_null:adj_rsq_null_to_fit_diff + 
     predictor_is_null:df_ratio_fit_to_null_ratio", data = df)
-anova(glm_final, glm_transformed_1, test="Chisq")
+anova(glm_combined, glm_transformed_1, test="Chisq")
 # not significant!
 
 # try transforming the other powers of 3
@@ -159,7 +158,7 @@ glm_transformed_2 = glm("is_factor ~ df_ratio_null + df_ratio_fit + pow_alias_fi
     df_ratio_fit:predictor_is_null + 
     predictor_is_null:is_na_adj_rsq_param + predictor_is_null:adj_rsq_null_to_fit_diff + 
     predictor_is_null:df_ratio_fit_to_null_ratio", data = df)
-anova(glm_final, glm_transformed_2, test="Chisq")
+anova(glm_combined, glm_transformed_2, test="Chisq")
 # not significant!
 
 # try transforming everything
@@ -171,11 +170,11 @@ glm_transformed_3 = glm("is_factor ~ log_df_ratio_null + log_df_ratio_fit + pow_
     df_ratio_fit:predictor_is_null + 
     predictor_is_null:is_na_adj_rsq_param + predictor_is_null:adj_rsq_null_to_fit_diff + 
     predictor_is_null:df_ratio_fit_to_null_ratio", data = df)
-anova(glm_final, glm_transformed_2, test="Chisq")
+anova(glm_combined, glm_transformed_2, test="Chisq")
 # still not significant!
 
 # still a lot of covariance
-sort(vif(glm_final))
+sort(vif(glm_combined))
 glm_pruned = glm("is_factor ~ df_ratio_null + alias_fit + 
     median_pval_null + pval_param + predictor_is_null + 
     is_na_anova_p + is_na_pval_param + is_na_adj_rsq_param + 
@@ -184,9 +183,99 @@ glm_pruned = glm("is_factor ~ df_ratio_null + alias_fit +
     predictor_is_null:is_na_adj_rsq_param + predictor_is_null:adj_rsq_null_to_fit_diff + 
     predictor_is_null:df_ratio_fit_to_null_ratio", data = df)
 summary(glm_pruned)
-anova(glm_final, glm_pruned, test="Chisq")
+anova(glm_combined, glm_pruned, test="Chisq")
 # unfortunately it's not significantly similar, and also has worse residuals
 
-# therefore we conclude with glm_final
-# let's look at the slopes
-summary(glm_final)
+# vif is too high for most
+max(vif(aic_back_glm))
+max(vif(bic_back_glm))  # only these are reasonable
+max(vif(aic_forward_glm))
+max(vif(bic_forward_glm))  # only these are reasonable
+
+# the recombined model is too hard to interpret
+# so split models again
+df_no_predictor = engineered_df[engineered_df$predictor_is_null,]
+df_no_predictor$predictor_is_null = NULL
+full_model_no_predictor = glm(as.formula("is_factor ~ ."), data=df_no_predictor)
+null_model_no_predictor = glm(as.formula("is_factor ~ 1"), data=df_no_predictor)
+
+aic_back_glm_no_predictor = eval(step(full_model_no_predictor, direction="backward", k=2)$call)
+bic_back_glm_no_predictor = eval(step(full_model_no_predictor, direction="backward", k=log(n))$call)
+aic_forward_glm_no_predictor = eval(step(null_model_no_predictor, scope=formula(full_model_no_predictor), direction="forward", k=2)$call)
+bic_forward_glm_no_predictor = eval(step(null_model_no_predictor, scope=formula(full_model_no_predictor), direction="forward", k=log(n))$call)
+max(vif(aic_back_glm_no_predictor)) # this is no good
+max(vif(bic_back_glm_no_predictor))
+max(vif(aic_forward_glm_no_predictor))
+max(vif(bic_forward_glm_no_predictor))
+summary(aic_back_glm_no_predictor)$deviance
+summary(bic_back_glm_no_predictor)$deviance
+summary(aic_forward_glm_no_predictor)$deviance
+summary(bic_forward_glm_no_predictor)$deviance
+mmps(aic_back_glm_no_predictor)
+mmps(bic_back_glm_no_predictor) # these are terrible
+mmps(aic_forward_glm_no_predictor) # this one is the tightest
+mmps(bic_forward_glm_no_predictor) # these are terrible
+intersect_coefficients(aic_back_glm_no_predictor, aic_forward_glm_no_predictor)
+# try to remove the non-significant variables (last 2)
+summary(aic_back_glm_no_predictor)
+aic_back_glm_no_predictor$call
+glm(formula = is_factor ~ df_ratio_fit + aic_null_to_fit_diff + 
+    anova_p + adj_rsq_param + is_na_anova_p + is_na_pval_param + 
+    adj_rsq_null_to_fit_diff + max_pval_null_to_fit_diff, data = df_no_predictor)
+
+pruned_aic_back_glm_no_predictor = glm(formula = is_factor ~ df_ratio_fit + aic_null_to_fit_diff + 
+    anova_p + adj_rsq_param + is_na_anova_p + is_na_pval_param, data = df_no_predictor)
+# this is just barely not significantly different, pick simpler one
+anova(aic_back_glm_no_predictor, pruned_aic_back_glm_no_predictor, test="Chisq")
+# final model in the case where predictor is null (only response ~ candidate)
+summary(pruned_aic_back_glm_no_predictor)
+mmps(pruned_aic_back_glm_no_predictor)
+
+df_with_predictor = engineered_df[!engineered_df$predictor_is_null,]
+df_with_predictor$predictor_is_null = NULL
+full_model_with_predictor = glm(as.formula("is_factor ~ ."), data=df_with_predictor)
+null_model_with_predictor = glm(as.formula("is_factor ~ 1"), data=df_with_predictor)
+
+aic_back_glm_with_predictor = eval(step(full_model_with_predictor, direction="backward", k=2)$call)
+bic_back_glm_with_predictor = eval(step(full_model_with_predictor, direction="backward", k=log(n))$call)
+aic_forward_glm_with_predictor = eval(step(null_model_with_predictor, scope=formula(full_model_with_predictor), direction="forward", k=2)$call)
+bic_forward_glm_with_predictor = eval(step(null_model_with_predictor, scope=formula(full_model_with_predictor), direction="forward", k=log(n))$call)
+max(vif(aic_back_glm_with_predictor)) # too high
+max(vif(bic_back_glm_with_predictor)) # too high
+max(vif(aic_forward_glm_with_predictor))
+max(vif(bic_forward_glm_with_predictor))
+summary(aic_back_glm_with_predictor)$deviance
+summary(bic_back_glm_with_predictor)$deviance
+summary(aic_forward_glm_with_predictor)$deviance
+summary(bic_forward_glm_with_predictor)$deviance
+# the regression is not quite as good as the no_predictor case
+mmps(aic_back_glm_with_predictor)
+mmps(bic_back_glm_with_predictor)
+mmps(aic_forward_glm_with_predictor)
+mmps(bic_forward_glm_with_predictor)
+
+# bic_back_glm_with_predictor is a strict subset with only slightly higher deviance
+intersect_coefficients(aic_back_glm_with_predictor, bic_back_glm_with_predictor)
+# see if we can prune bic_back_glm_with_predictor to get rid of vif issue
+vif(bic_back_glm_with_predictor)
+bic_back_glm_with_predictor$call
+
+pruned_bic_back_glm_with_predictor = glm(formula = is_factor ~ df_ratio_null + aic_null_to_fit_diff + 
+    is_na_anova_p + adj_rsq_null_to_fit_diff + df_ratio_fit_to_null_ratio, 
+    data = df_with_predictor)
+# they are different, because the two collinear terms have opposite slopes, meaning they are a nonlinearity!
+anova(bic_back_glm_with_predictor, pruned_bic_back_glm_with_predictor, test="Chisq")
+# take the most interpretable model
+# final model in the case where predictor is not null (response ~ predictor + candidate + candidate:predictor)
+summary(bic_back_glm_with_predictor)
+mmps(bic_back_glm_with_predictor)
+
+pruned_aic_back_glm_no_predictor$call
+bic_back_glm_with_predictor$call
+
+final_no_predictor = glm(formula = is_factor ~ df_ratio_fit + aic_null_to_fit_diff + 
+    anova_p + adj_rsq_param + is_na_anova_p + is_na_pval_param, data = df_no_predictor)
+
+final_with_predictor = glm(formula = is_factor ~ df_ratio_null + df_ratio_fit + aic_null_to_fit_diff + 
+    is_na_anova_p + adj_rsq_null_to_fit_diff + df_ratio_fit_to_null_ratio, 
+    data = df_with_predictor)

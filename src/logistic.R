@@ -104,3 +104,11 @@ remove_constant_cols = function(df) {
     }
     return(df)
 }
+
+intersect_coefficients = function(glm1, glm2) {
+    names1 = names(glm1$coefficients)
+    names2 = names(glm2$coefficients)
+    intersection = intersect(names1, names2)
+    print(paste(length(intersection), "in commmon out of ", length(names1), "in first,", length(names2), "in second."))
+    return(intersection)
+}

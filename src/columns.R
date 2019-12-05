@@ -205,7 +205,7 @@ evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric
         n = nrow(test)
         test_error_null = predict(lm_null, test) - test[,response]
         test_error_fit = predict(lm_fit, test) - test[,response]
-        num_null = sum(abs(test_error_null) >= abs(test_error_fit))
+        num_null = sum(abs(test_error_null) <= abs(test_error_fit))
         num_fit = n - num_null
         # response under testing
         test_mse_null = sum( test_error_null^2 ) / n
@@ -372,7 +372,7 @@ evaluate_columns = function(dataframe, response, predictor, candidate_as_numeric
 }
 
 test_error_diff = function(test_error_null, test_error_fit) {
-    wtest = wilcox.test(test_error_null, test_error_fit, paired=TRUE, correct=TRUE, alternative="less")
+    wtest = wilcox.test(test_error_null, test_error_fit, paired=TRUE, correct=TRUE, alternative="greater")
     return(wtest$p.value)
 }
 
