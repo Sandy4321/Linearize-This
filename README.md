@@ -1,5 +1,5 @@
-Linception
-==========
+Linearize This!
+==============
 
 A meta-dataset and logistic meta-model for classifying categorical variables
 and interaction terms.
